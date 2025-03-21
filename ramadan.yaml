@@ -1,0 +1,96 @@
+openapi: 3.0.0
+info:
+  title: Ramadan REST API
+  version: 1.0.0
+  description: A simple API that provides information about Ramadan, protected by JWT bearer tokens.
+
+servers:
+  - url: https://ramadan-rmhl.onrender.com
+
+paths:
+  /login:
+    post:
+      summary: Get JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+      responses:
+        '200':
+          description: JWT token returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+
+  /ramadan:
+    get:
+      summary: Get general info about Ramadan
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Ramadan info
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /ramadan/month:
+    get:
+      summary: Get month number of Ramadan
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Month of Ramadan
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /ramadan/benefits:
+    get:
+      summary: Get list of Ramadan benefits
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of benefits
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  benefits:
+                    type: array
+                    items:
+                      type: string
+
+  /ramadan/fasting:
+    get:
+      summary: Get info about fasting
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Info about fasting
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
