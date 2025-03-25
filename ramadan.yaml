@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Ramadan REST API
-  version: 1.0.1 #2 endpoints added
+  version: 1.0.2 #1 endpoints added
   description: A simple API that provides information about Ramadan, protected by JWT bearer tokens.
 
 servers:
@@ -21,7 +21,7 @@ paths:
                 username:
                   type: string
       responses:
-        '200':
+        "200":
           description: JWT token returned
           content:
             application/json:
@@ -37,7 +37,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Ramadan info
           content:
             application/json:
@@ -50,7 +50,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Month of Ramadan
           content:
             application/json:
@@ -63,7 +63,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of benefits
           content:
             application/json:
@@ -81,7 +81,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Info about fasting
           content:
             application/json:
@@ -94,7 +94,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Info about Iftar
           content:
             application/json:
@@ -110,7 +110,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Info about Suhoor
           content:
             application/json:
@@ -118,6 +118,21 @@ paths:
                 type: object
                 properties:
                   suhoor:
+                    type: string
+  /ramadan/prayers:
+    get:
+      summary: Get info about Taraweeh prayers
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Info about Taraweeh prayers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prayers:
                     type: string
 
 components:
