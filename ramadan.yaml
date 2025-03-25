@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Ramadan REST API
-  version: 1.0.0
+  version: 1.0.1 #2 endpoints added
   description: A simple API that provides information about Ramadan, protected by JWT bearer tokens.
 
 servers:
@@ -87,6 +87,38 @@ paths:
             application/json:
               schema:
                 type: object
+
+  /ramadan/iftar:
+    get:
+      summary: Get info about Iftar
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Info about Iftar
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  iftar:
+                    type: string
+
+  /ramadan/suhoor:
+    get:
+      summary: Get info about Suhoor
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Info about Suhoor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suhoor:
+                    type: string
 
 components:
   securitySchemes:
