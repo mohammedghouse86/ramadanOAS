@@ -154,21 +154,21 @@ paths:
                     items:
                       type: string
 
-  /ramadan/zakat:
-      get:
-        summary: Get info about Zakat during Ramadan
-        security:
-          - bearerAuth: []
-        responses:
-          "200":
-            description: Information about Zakat
-            content:
-              application/json:
-                schema:
-                  type: object
-                  properties:
-                    zakat:
-                      type: string
+  # /ramadan/zakat:
+  #     get:
+  #       summary: Get info about Zakat during Ramadan
+  #       security:
+  #         - bearerAuth: []
+  #       responses:
+  #         "200":
+  #           description: Information about Zakat
+  #           content:
+  #             application/json:
+  #               schema:
+  #                 type: object
+  #                 properties:
+  #                   zakat:
+  #                     type: string
 
 
 components:
