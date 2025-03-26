@@ -119,6 +119,7 @@ paths:
                 properties:
                   suhoor:
                     type: string
+
   /ramadan/prayers:
     get:
       summary: Get info about Taraweeh prayers
@@ -134,6 +135,41 @@ paths:
                 properties:
                   prayers:
                     type: string
+
+  /ramadan/tips:
+    get:
+      summary: Get tips for fasting during Ramadan
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of helpful tips
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tips:
+                    type: array
+                    items:
+                      type: string
+
+  /ramadan/zakat:
+      get:
+        summary: Get info about Zakat during Ramadan
+        security:
+          - bearerAuth: []
+        responses:
+          "200":
+            description: Information about Zakat
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    zakat:
+                      type: string
+
 
 components:
   securitySchemes:
