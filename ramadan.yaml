@@ -181,6 +181,174 @@ paths:
                   - "Avoid heavy meals at Iftar"
                   - "Rest when possible"
 
+  /ramadan/night_of_power:
+    post:
+      summary: Check if given day is the Night of Power
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                day:
+                  type: integer
+              required:
+                - day
+            example:
+              day: 27
+      responses:
+        "200":
+          description: Day is the Night of Power
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "✅ Yes, 27 is the Night of Power."
+        "400":
+          description: Not the Night of Power
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "❌ No, the given day is not the Night of Power."
+
+  /ramadan/fast_required:
+    post:
+      summary: Check if fasting is required on a given day
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                day:
+                  type: integer
+              required:
+                - day
+            example:
+              day: 15
+      responses:
+        "200":
+          description: Fasting is required
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "✅ Yes, fasting is required on day 15 of Ramadan."
+        "400":
+          description: Fasting not required
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "❌ No, fasting is not required on this day."
+
+  /ramadan/zakat_due:
+    post:
+      summary: Check if zakat is due based on wealth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                wealth:
+                  type: number
+              required:
+                - wealth
+            example:
+              wealth: 5000
+      responses:
+        "200":
+          description: Zakat is due
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "✅ Yes, zakat is due on this amount."
+        "400":
+          description: Zakat not due
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "❌ No, zakat is not due on this amount."
+
+  /ramadan/iftar_time:
+    post:
+      summary: Get iftar time for a city
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                city:
+                  type: string
+              required:
+                - city
+            example:
+              city: "Mecca"
+      responses:
+        "200":
+          description: Iftar time found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "🕓 Iftar time in Mecca is 6:45 PM."
+        "400":
+          description: City not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "❌ Iftar time for the given city is not available."
+
 components:
   securitySchemes:
     bearerAuth:
