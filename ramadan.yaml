@@ -181,6 +181,24 @@ paths:
                   - "Avoid heavy meals at Iftar"
                   - "Rest when possible"
 
+  /ramadan/admin:
+    get:
+      summary: Get Ramadan admin info
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Admin info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  admin:
+                    type: string
+              example:
+                admin: "ramadan.admin"
+
   /ramadan/night_of_power:
     post:
       summary: Check if given day is the Night of Power
