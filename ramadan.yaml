@@ -37,6 +37,36 @@ paths:
               example:
                 token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
+  /users/revokeToken:
+    post:
+      summary: Revoke the current JWT token
+      description: Adds the presented JWT to a server-side denylist so it can no longer be used, even before its natural expiry.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Token successfully revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "Token has been revoked successfully."
+        "401":
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "Authorization token is missing or invalid."
+
   /ramadan:
     get:
       summary: Get general info about Ramadan
