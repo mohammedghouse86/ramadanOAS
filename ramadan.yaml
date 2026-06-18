@@ -1,110 +1,168 @@
-openapi: 3.0.0
+openapi: 3.0.3
+
 info:
-  title: Ramadan REST API
-  version: 1.0.2
-  description: A simple API that provides information about Ramadan, protected by JWT bearer tokens.
+  title: Ramadan Multi-Tenant API
+  version: 1.0.0
+  description: >
+    Lightweight, database-free multi-tenant API serving Ramadan reference
+    information plus tenant-scoped user management.
+
+
+    **Auth model:** name-only login. `POST /login` with just a `name` returns a
+    JWT (1h expiry, issuer `myapi.example.com`). Seeded users keep their role and
+    tenant; any unknown name auto-creates a regular `user` with the next integer
+    id. Send the token as `Authorization: Bearer <token>` on every other request.
+
+
+    **Tenants:** every user belongs to a `tenantId` (integer). All admin reads
+    and writes — and several Ramadan utility endpoints (Iftar times, zakat nisab)
+    — are scoped to the caller's tenant.
+
+
+    **Roles:** `admin` and `user`. Admin-only endpoints require `role: "admin"`
+    and only ever act within the admin's own tenant.
+
+
+    **PII:** user records carry personal data (full name, email, phone, address,
+    date of birth, national id). PII is returned by `GET /me` (your own) and by
+    the admin user endpoints. Non-admin/general responses omit it.
+
+
+    **No database:** seeded tenants/users always exist; runtime-created users and
+    the audit log are in-memory and reset on server restart.
+  contact:
+    name: API Operations
+    email: ops@crescent.example.com
 
 servers:
-  - url: https://ramadan-rmhl.onrender.com
+  - url: http://localhost:3000
+    description: Local development server
+
+tags:
+  - name: Auth
+    description: Name-only login and token lifecycle
+  - name: Profile
+    description: The authenticated user's own profile (includes PII)
+  - name: Ramadan Info
+    description: Read-only Ramadan reference content (authenticated)
+  - name: Ramadan Tools
+    description: Utility checks (Night of Power, fasting, zakat, Iftar times)
+  - name: Admin
+    description: Admin-only, tenant-scoped user and tenant management
+
+# Applied globally; /login overrides with security: [] (public).
+security:
+  - bearerAuth: []
 
 paths:
+
   /login:
     post:
-      summary: Get JWT token
+      tags: [Auth]
+      summary: Log in by name (no password)
+      description: >
+        Returns a JWT for the given name. A seeded user (`admin1`, `user1`,
+        `admin2`) logs in with its existing role and tenant. An unknown name
+        auto-creates a regular `user`; pass `tenantId` to place them in a
+        specific tenant (defaults to tenant 1).
+      operationId: login
+      security: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                username:
-                  type: string
-              required:
-                - username
-            example:
-              username: "user123"
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              seededAdmin:
+                summary: Log in as seeded admin
+                value: { name: admin1 }
+              seededUser:
+                summary: Log in as seeded user
+                value: { name: user1 }
+              newUserTenant2:
+                summary: Auto-create a new user in tenant 2
+                value: { name: zaid, tenantId: 2 }
       responses:
-        "200":
-          description: JWT token returned
+        '200':
+          description: Login successful; token issued.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  token:
-                    type: string
-              example:
-                token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Missing name or invalid tenantId.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
-  /users/revokeToken:
-    post:
-      summary: Revoke the current JWT token
-      description: Adds the presented JWT to a server-side denylist so it can no longer be used, even before its natural expiry.
-      security:
-        - bearerAuth: []
+  /me:
+    get:
+      tags: [Profile]
+      summary: Get your own profile (includes your PII)
+      operationId: getMe
       responses:
-        "200":
-          description: Token successfully revoked
+        '200':
+          description: The authenticated user's full record.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-              example:
-                message: "Token has been revoked successfully."
-        "401":
-          description: Missing or invalid token
+                $ref: '#/components/schemas/SelfProfile'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: The authenticated user no longer exists.
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-              example:
-                message: "Authorization token is missing or invalid."
+              schema: { $ref: '#/components/schemas/Error' }
 
   /ramadan:
     get:
-      summary: Get general info about Ramadan
-      security:
-        - bearerAuth: []
+      tags: [Ramadan Info]
+      summary: General Ramadan info
+      operationId: getRamadan
       responses:
-        "200":
-          description: Ramadan info
+        '200':
+          description: Month name and description.
           content:
             application/json:
               schema:
                 type: object
-              example:
-                message: "Ramadan is the ninth month of the Islamic calendar."
+                properties:
+                  month: { type: string, example: Ramadan }
+                  description: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /ramadan/month:
     get:
-      summary: Get month number of Ramadan
-      security:
-        - bearerAuth: []
+      tags: [Ramadan Info]
+      summary: Which month is Ramadan
+      operationId: getRamadanMonth
       responses:
-        "200":
-          description: Month of Ramadan
+        '200':
+          description: Month name, number, and a summary message.
           content:
             application/json:
               schema:
                 type: object
-              example:
-                month: 9
+                properties:
+                  name: { type: string, example: Ramadan }
+                  number: { type: integer, example: 9 }
+                  message: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /ramadan/benefits:
     get:
-      summary: Get list of Ramadan benefits
-      security:
-        - bearerAuth: []
+      tags: [Ramadan Info]
+      summary: Benefits of Ramadan
+      operationId: getRamadanBenefits
       responses:
-        "200":
-          description: List of benefits
+        '200':
+          description: List of benefits.
           content:
             application/json:
               schema:
@@ -112,90 +170,87 @@ paths:
                 properties:
                   benefits:
                     type: array
-                    items:
-                      type: string
-              example:
-                benefits:
-                  - "Improves self-discipline"
-                  - "Increases empathy for the less fortunate"
+                    items: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /ramadan/fasting:
     get:
-      summary: Get info about fasting
-      security:
-        - bearerAuth: []
+      tags: [Ramadan Info]
+      summary: Info about fasting
+      operationId: getRamadanFasting
       responses:
-        "200":
-          description: Info about fasting
+        '200':
+          description: Fasting description.
           content:
             application/json:
               schema:
                 type: object
-              example:
-                message: "Fasting during Ramadan means abstaining from food, drink, and other physical needs during daylight hours."
+                properties:
+                  fasting: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /ramadan/iftar:
     get:
-      summary: Get info about Iftar
-      security:
-        - bearerAuth: []
+      tags: [Ramadan Info]
+      summary: Info about Iftar
+      operationId: getRamadanIftar
       responses:
-        "200":
-          description: Info about Iftar
+        '200':
+          description: Iftar description.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  iftar:
-                    type: string
-              example:
-                iftar: "Iftar is the meal with which Muslims break their fast at sunset."
+                  iftar: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /ramadan/suhoor:
     get:
-      summary: Get info about Suhoor
-      security:
-        - bearerAuth: []
+      tags: [Ramadan Info]
+      summary: Info about Suhoor
+      operationId: getRamadanSuhoor
       responses:
-        "200":
-          description: Info about Suhoor
+        '200':
+          description: Suhoor description.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  suhoor:
-                    type: string
-              example:
-                suhoor: "Suhoor is the pre-dawn meal before the fast begins."
+                  suhoor: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /ramadan/prayers:
     get:
-      summary: Get info about Taraweeh prayers
-      security:
-        - bearerAuth: []
+      tags: [Ramadan Info]
+      summary: Info about Taraweeh prayers
+      operationId: getRamadanPrayers
       responses:
-        "200":
-          description: Info about Taraweeh prayers
+        '200':
+          description: Prayers description.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  prayers:
-                    type: string
-              example:
-                prayers: "Taraweeh are special night prayers performed during Ramadan."
+                  prayers: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /ramadan/tips:
     get:
-      summary: Get tips for fasting during Ramadan
-      security:
-        - bearerAuth: []
+      tags: [Ramadan Info]
+      summary: Tips for Ramadan
+      description: Now requires authentication (previously public).
+      operationId: getRamadanTips
       responses:
-        "200":
-          description: List of helpful tips
+        '200':
+          description: List of tips.
           content:
             application/json:
               schema:
@@ -203,37 +258,33 @@ paths:
                 properties:
                   tips:
                     type: array
-                    items:
-                      type: string
-              example:
-                tips:
-                  - "Drink plenty of water at Suhoor"
-                  - "Avoid heavy meals at Iftar"
-                  - "Rest when possible"
+                    items: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
-  /ramadan/admin:
+  /ramadan/zakat:
     get:
-      summary: Get Ramadan admin info
-      security:
-        - bearerAuth: []
+      tags: [Ramadan Info]
+      summary: Zakat info
+      operationId: getRamadanZakat
       responses:
-        "200":
-          description: Admin info
+        '200':
+          description: Zakat description.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  admin:
-                    type: string
-              example:
-                admin: "ramadan.admin"
+                  zakat: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /ramadan/night_of_power:
     post:
-      summary: Check if given day is the Night of Power
-      security:
-        - bearerAuth: []
+      tags: [Ramadan Tools]
+      summary: Check if a day is the Night of Power
+      description: Returns success only when `day` equals 27.
+      operationId: checkNightOfPower
       requestBody:
         required: true
         content:
@@ -241,41 +292,28 @@ paths:
             schema:
               type: object
               properties:
-                day:
-                  type: integer
-              required:
-                - day
-            example:
-              day: 27
+                day: { type: integer, example: 27 }
+              required: [day]
       responses:
-        "200":
-          description: Day is the Night of Power
+        '200':
+          description: The given day is the Night of Power.
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-              example:
-                message: "✅ Yes, 27 is the Night of Power."
-        "400":
-          description: Not the Night of Power
+              schema: { $ref: '#/components/schemas/Message' }
+        '400':
+          description: The given day is not the Night of Power.
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-              example:
-                message: "❌ No, the given day is not the Night of Power."
+              schema: { $ref: '#/components/schemas/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /ramadan/fast_required:
     post:
-      summary: Check if fasting is required on a given day
-      security:
-        - bearerAuth: []
+      tags: [Ramadan Tools]
+      summary: Check if fasting is required on a day
+      description: Success when `day` is between 1 and 29 inclusive.
+      operationId: checkFastRequired
       requestBody:
         required: true
         content:
@@ -283,41 +321,30 @@ paths:
             schema:
               type: object
               properties:
-                day:
-                  type: integer
-              required:
-                - day
-            example:
-              day: 15
+                day: { type: integer, example: 5 }
+              required: [day]
       responses:
-        "200":
-          description: Fasting is required
+        '200':
+          description: Fasting is required on this day.
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-              example:
-                message: "✅ Yes, fasting is required on day 15 of Ramadan."
-        "400":
-          description: Fasting not required
+              schema: { $ref: '#/components/schemas/Message' }
+        '400':
+          description: Fasting is not required on this day.
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-              example:
-                message: "❌ No, fasting is not required on this day."
+              schema: { $ref: '#/components/schemas/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /ramadan/zakat_due:
     post:
-      summary: Check if zakat is due based on wealth
-      security:
-        - bearerAuth: []
+      tags: [Ramadan Tools]
+      summary: Check if zakat is due (tenant nisab)
+      description: >
+        Compares `wealth` against the caller's tenant nisab threshold
+        (tenant 1 = 3960, tenant 2 = 4200).
+      operationId: checkZakatDue
       requestBody:
         required: true
         content:
@@ -325,41 +352,30 @@ paths:
             schema:
               type: object
               properties:
-                wealth:
-                  type: number
-              required:
-                - wealth
-            example:
-              wealth: 5000
+                wealth: { type: number, example: 5000 }
+              required: [wealth]
       responses:
-        "200":
-          description: Zakat is due
+        '200':
+          description: Zakat is due on this amount.
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-              example:
-                message: "✅ Yes, zakat is due on this amount."
-        "400":
-          description: Zakat not due
+              schema: { $ref: '#/components/schemas/Message' }
+        '400':
+          description: Zakat is not due on this amount.
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-              example:
-                message: "❌ No, zakat is not due on this amount."
+              schema: { $ref: '#/components/schemas/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /ramadan/iftar_time:
     post:
-      summary: Get iftar time for a city
-      security:
-        - bearerAuth: []
+      tags: [Ramadan Tools]
+      summary: Get Iftar time for a city (tenant-scoped)
+      description: >
+        Cities available depend on the caller's tenant. Tenant 1 has
+        Mecca/Medina/Cairo; tenant 2 has Hyderabad/Karachi/Lahore.
+      operationId: getIftarTime
       requestBody:
         required: true
         content:
@@ -367,39 +383,339 @@ paths:
             schema:
               type: object
               properties:
-                city:
-                  type: string
-              required:
-                - city
-            example:
-              city: "Mecca"
+                city: { type: string, example: Mecca }
+              required: [city]
       responses:
-        "200":
-          description: Iftar time found
+        '200':
+          description: Iftar time for the requested city.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '400':
+          description: City not available for this tenant.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  message:
-                    type: string
-              example:
-                message: "🕓 Iftar time in Mecca is 6:45 PM."
-        "400":
-          description: City not found
+                  error: { type: string }
+                  availableCities:
+                    type: array
+                    items: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /users/revokeToken:
+    post:
+      tags: [Auth]
+      summary: Revoke your current token
+      description: Adds the presented token to the blacklist; future use returns 401.
+      operationId: revokeToken
+      responses:
+        '200':
+          description: Token revoked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: List users in your tenant (with PII)
+      operationId: adminListUsers
+      responses:
+        '200':
+          description: All members of the admin's tenant, including PII.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  message:
-                    type: string
-              example:
-                message: "❌ Iftar time for the given city is not available."
+                  tenant: { type: string, example: Crescent Org }
+                  count: { type: integer, example: 2 }
+                  users:
+                    type: array
+                    items: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/AdminForbidden' }
+    post:
+      tags: [Admin]
+      summary: Create a user in your tenant
+      description: Integer id is auto-assigned. Optional role and PII.
+      operationId: adminCreateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '400':
+          description: Missing name.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/AdminForbidden' }
+        '409':
+          description: A user with that name already exists.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /admin/users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IntegerUserId'
+    get:
+      tags: [Admin]
+      summary: Get one user by integer id (with PII)
+      description: Must belong to the admin's tenant. Non-integer ids are rejected.
+      operationId: adminGetUser
+      responses:
+        '200':
+          description: The requested user record, including PII.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '400':
+          description: Id is not an integer.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/AdminForbidden' }
+        '404':
+          description: User not found in your tenant.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      tags: [Admin]
+      summary: Delete a user by integer id
+      description: Must be in your tenant. You cannot delete your own account.
+      operationId: adminDeleteUser
+      responses:
+        '200':
+          description: User deleted.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '400':
+          description: Id is not an integer, or attempt to delete self.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/AdminForbidden' }
+        '404':
+          description: User not found in your tenant.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /admin/tenant:
+    get:
+      tags: [Admin]
+      summary: Get your tenant's sensitive config
+      description: Includes apiKey and contact email — admin only.
+      operationId: adminGetTenant
+      responses:
+        '200':
+          description: The admin's tenant configuration.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tenant' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/AdminForbidden' }
+        '404':
+          description: Tenant not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /admin/audit:
+    get:
+      tags: [Admin]
+      summary: Tenant-scoped audit log
+      description: Login, user-create and user-delete events for your tenant.
+      operationId: adminGetAudit
+      responses:
+        '200':
+          description: Audit entries for the admin's tenant.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenant: { type: string, example: Crescent Org }
+                  entries:
+                    type: array
+                    items: { $ref: '#/components/schemas/AuditEntry' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/AdminForbidden' }
 
 components:
+
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: "JWT obtained from `POST /login`. Send as `Authorization: Bearer <token>`."
+
+  parameters:
+    IntegerUserId:
+      name: id
+      in: path
+      required: true
+      description: User id. Must be a positive integer (alphanumeric ids are rejected with 400).
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+      example: 2
+
+  responses:
+    Unauthorized:
+      description: Missing, revoked, or otherwise unusable token (no body).
+    Forbidden:
+      description: Token failed verification, e.g. expired or bad signature (no body).
+    AdminForbidden:
+      description: Authenticated but not an admin.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: "⛔ Admin access required." }
+    RateLimited:
+      description: Rate limit exceeded.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+
+    LoginRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: Any name. Seeded names map to existing users; unknown names are created.
+          example: admin1
+        tenantId:
+          type: integer
+          description: Optional. Only used when auto-creating a new user. Defaults to 1.
+          example: 2
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT, 1h expiry, issuer `myapi.example.com`.
+        user:
+          $ref: '#/components/schemas/PublicUser'
+        tenant:
+          type: string
+          example: Crescent Org
+
+    PublicUser:
+      type: object
+      description: User without PII.
+      properties:
+        id: { type: integer, example: 1 }
+        name: { type: string, example: admin1 }
+        role: { $ref: '#/components/schemas/Role' }
+        tenantId: { type: integer, example: 1 }
+
+    User:
+      type: object
+      description: Full user record including PII (admin views and /admin/* only).
+      properties:
+        id: { type: integer, example: 1 }
+        name: { type: string, example: admin1 }
+        role: { $ref: '#/components/schemas/Role' }
+        tenantId: { type: integer, example: 1 }
+        pii: { $ref: '#/components/schemas/PII' }
+
+    SelfProfile:
+      type: object
+      description: The authenticated user's own profile from /me.
+      properties:
+        id: { type: integer, example: 2 }
+        name: { type: string, example: user1 }
+        role: { $ref: '#/components/schemas/Role' }
+        tenantId: { type: integer, example: 1 }
+        tenant: { type: string, example: Crescent Org }
+        pii: { $ref: '#/components/schemas/PII' }
+
+    PII:
+      type: object
+      description: Personally identifiable information.
+      properties:
+        fullName: { type: string, nullable: true, example: Bilal Khan }
+        email: { type: string, nullable: true, example: bilal.khan@crescent.example.com }
+        phone: { type: string, nullable: true, example: "+966-55-444-5566" }
+        address: { type: string, nullable: true, example: "88 Olaya St, Riyadh, Saudi Arabia" }
+        dateOfBirth: { type: string, nullable: true, example: "1994-09-02" }
+        nationalId: { type: string, nullable: true, example: "1076543210" }
+
+    CreateUserRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, example: kareem }
+        role:
+          allOf:
+            - $ref: '#/components/schemas/Role'
+          default: user
+        pii: { $ref: '#/components/schemas/PII' }
+
+    Role:
+      type: string
+      enum: [admin, user]
+
+    Tenant:
+      type: object
+      description: Tenant config. apiKey and contactEmail are sensitive (admin only).
+      properties:
+        id: { type: integer, example: 1 }
+        name: { type: string, example: Crescent Org }
+        timezone: { type: string, example: Asia/Riyadh }
+        iftarTimes:
+          type: object
+          additionalProperties: { type: string }
+          example: { Mecca: "6:45 PM", Medina: "6:40 PM", Cairo: "6:30 PM" }
+        zakatNisab: { type: integer, example: 3960 }
+        contactEmail: { type: string, example: ops@crescent.example.com }
+        apiKey: { type: string, example: tnt_1_9f3a7c21bd44 }
+
+    AuditEntry:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        tenantId: { type: integer, example: 1 }
+        actorId: { type: integer, example: 1 }
+        actorName: { type: string, example: admin1 }
+        action:
+          type: string
+          description: e.g. `login`, `create_user:5`, `delete_user:5`.
+          example: login
+        at: { type: string, format: date-time }
+
+    Message:
+      type: object
+      properties:
+        message: { type: string }
+
+    Error:
+      type: object
+      properties:
+        error: { type: string }
