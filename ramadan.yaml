@@ -405,21 +405,6 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
-  /users/revokeToken:
-    post:
-      tags: [Auth]
-      summary: Revoke your current token
-      description: Adds the presented token to the blacklist; future use returns 401.
-      operationId: revokeToken
-      responses:
-        '200':
-          description: Token revoked.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Message' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-
   /admin/users:
     get:
       tags: [Admin]
